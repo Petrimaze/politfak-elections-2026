@@ -126,10 +126,11 @@ party_points <- mca_points |> filter(variable == "party")
 feature_points <- mca_points |> filter(variable != "party")
 party_order_mca <- c(party_order[party_order %in% party_points$category],
   intersect("Не определились", party_points$category))
+# |v-тест| ≥ 2 — группа заметно отличается от среднего; в тексте без терминов.
 significance_note <- function(v) {
-  if (v >= 2) "отличие от центра значимо (|v-тест| ≥ 2)"
-  else if (v >= 1.6) "отличие на грани значимости"
-  else "почти не отличается от центра карты"
+  if (v >= 2) "заметно отличается от остальных"
+  else if (v >= 1.6) "отличается, но на грани случайности"
+  else "почти не отличается от остальных"
 }
 pole <- function(points, axis, side) {
   points |> mutate(contrib = if (axis == "x") c1 else c2, coord = .data[[axis]]) |>
@@ -137,11 +138,11 @@ pole <- function(points, axis, side) {
     arrange(desc(contrib)) |> head(3) |> pull(category)
 }
 x_title <- paste0("← ", paste(pole(feature_points, "x", -1), collapse = ", "),
-  "     ось 1 · ", mca_inertia[1], "% инерции     ",
+  "     главное различие (", mca_inertia[1], "%)     ",
   paste(pole(feature_points, "x", 1), collapse = ", "), " →")
 # Подпись оси Y повёрнута на 90°: стрелки ← и → после поворота смотрят вниз и вверх.
 y_title <- paste0("← ", paste(pole(feature_points, "y", -1), collapse = ", "),
-  "     ось 2 · ", mca_inertia[2], "% инерции     ",
+  "     второе различие (", mca_inertia[2], "%)     ",
   paste(pole(feature_points, "y", 1), collapse = ", "), " →")
 map_span <- max(abs(c(mca_points$x, mca_points$y, party_sup$x, party_sup$y))) * 1.12
 kind_shapes <- c("Черта характера" = 16, "Пол и курс" = 15, "Что важно в кампании" = 18)
@@ -153,12 +154,10 @@ draw_portrait_map <- function(selected = NULL, robustness = FALSE) {
     mutate(picked = category %in% picked,
       alpha = if (focused) if_else(picked, 1, 0.22) else 0.75,
       colour = if_else(picked, "#182C38", "#8B989F"),
-      tooltip = paste0(category, "\n", kind, " · n = ", n,
-        "\nv-тест по осям: ", round(v1, 1), " / ", round(v2, 1)))
+      tooltip = paste0(category, "\n", kind, " · ", n, " чел."))
   parties_shown <- party_points |>
     mutate(size = 4 + sqrt(n) * 0.9,
-      tooltip = paste0(category, "\nn = ", n, "\nv-тест по осям: ",
-        round(v1, 1), " / ", round(v2, 1), "\n",
+      tooltip = paste0(category, "\n", n, " чел. на карте\n",
         vapply(pmax(abs(v1), abs(v2)), significance_note, character(1)))) |>
     mutate(alpha = if (focused) if_else(category == selected, 1, 0.45) else 1)
   labels <- bind_rows(
@@ -172,8 +171,7 @@ draw_portrait_map <- function(selected = NULL, robustness = FALSE) {
   } else NULL
   halo <- if (focused) filter(parties_shown, category == selected) else NULL
   sup <- if (robustness) left_join(party_sup, select(party_points, category, ax = x, ay = y), by = "category") |>
-    mutate(tooltip = paste0(category, " · оси без партии\nv-тест по осям: ",
-      round(v1, 1), " / ", round(v2, 1), "\n",
+    mutate(tooltip = paste0(category, " · карта без партии\n",
       vapply(pmax(abs(v1), abs(v2)), significance_note, character(1)))) else NULL
 
   ggplot() +
@@ -209,10 +207,10 @@ draw_portrait_map <- function(selected = NULL, robustness = FALSE) {
         else if (focused) paste0(selected, ": чем выделяются сторонники") else "Кто за кого голосует",
       subtitle = if (robustness) "Цветная точка — партия на основной карте; кольцо — та же партия, если строить оси без неё"
         else if (focused) "Лучи ведут к признакам, которые у сторонников встречаются заметно чаще, чем у всех"
-        else paste0("MCA · ", mca_n, " анкет с правом голоса · близкие точки — признаки, которые часто встречаются вместе"),
+        else paste0(mca_n, " человек с правом голоса · близкие точки — признаки, которые часто встречаются вместе"),
       x = x_title, y = y_title, shape = NULL,
-      caption = paste0("Поправка Гринакра для доли инерции. Партии с n ≥ 5; небрежные и неполные анкеты исключены.",
-        "\nБлизость на двух осях — ориентир, а не доказательство связи; точные доли — в портрете под картой.")) +
+      caption = paste0("Метод — анализ соответствий (MCA); проценты у осей — какую часть различий между людьми они показывают.",
+        "\nПартии хотя бы с пятью сторонниками; небрежные и неполные анкеты исключены. Близость точек — подсказка, точные доли — под картой.")) +
     theme_minimal(base_size = 12) +
     theme(plot.background = element_rect(fill = "white", colour = NA),
       panel.grid.minor = element_blank(),
@@ -248,7 +246,7 @@ portrait_card <- function(selected) {
         if_else(r$diff >= 0, "+", ""), r$diff, " п. п.")))
   })
   htmltools::tags$div(class = "mca-neighbours",
-    htmltools::tags$p(class = "mca-quality", paste0(selected, ": n = ", point$n, "; ",
+    htmltools::tags$p(class = "mca-quality", paste0(selected, ": ", point$n, " чел. на карте; ",
       significance_note(max(abs(point$v1), abs(point$v2))), ".")),
     htmltools::tags$h4("Портрет сторонников"),
     htmltools::tags$ol(class = "mca-neighbour-list", cards))
@@ -285,10 +283,10 @@ robust_table <- function() {
     party_points |> transmute(Партия = category, n, a = pmax(abs(v1), abs(v2))),
     party_sup |> transmute(Партия = category, b = pmax(abs(v1), abs(v2))), by = "Партия") |>
     mutate(Партия = factor(Партия, levels = party_order_mca)) |> arrange(Партия) |>
-    transmute(Партия, n,
-      `Основная карта, max |v|` = formatC(a, format = "f", digits = 2, decimal.mark = ","),
-      `Оси без партии, max |v|` = formatC(b, format = "f", digits = 2, decimal.mark = ",")) |>
-    knitr::kable(align = c("l", "r", "r", "r"))
+    transmute(Партия, Человек = n,
+      `На основной карте` = vapply(a, significance_note, character(1)),
+      `На карте без партии` = vapply(b, significance_note, character(1))) |>
+    knitr::kable(align = c("l", "r", "l", "l"))
 }
 robust_significant <- party_sup |> filter(pmax(abs(v1), abs(v2)) >= 2) |> pull(category)
 

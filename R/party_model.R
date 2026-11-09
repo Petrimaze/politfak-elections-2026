@@ -108,8 +108,9 @@ model_effects <- pair_effects |>
     block = factor(unname(model_blocks[predictor]), levels = c("Кто", "Характер", "Что важно")),
     label = factor(unname(model_predictors[predictor]), levels = rev(unname(model_predictors))),
     text = paste0("×", format_ratio(ratio), if_else(ratio > 10 | ratio < 0.1, " ›", "")),
-    tooltip = paste0(model_predictors[predictor], "\n", contrast, "\nRRR = ", format_ratio(ratio),
-      " · 95% ДИ ", format_ratio(lower), "–", format_ratio(upper), "\np = ", format_p(p),
+    tooltip = paste0(model_predictors[predictor], "\n", contrast, "\nШансы ×", format_ratio(ratio),
+      " · вероятный разброс ×", format_ratio(lower), "–×", format_ratio(upper),
+      if_else(clear, "\nЭффект надёжный", "\nМожет быть случайным"),
       if_else(predictor %in% c("women", "junior"), "", "\nНа одно стандартное отклонение")))
 # Очень широкие интервалы обрезаются краем шкалы; точные границы — в подсказке.
 ratio_limits <- c(0.1, 10)
@@ -132,14 +133,13 @@ p_model <- ggplot(model_effects, aes(ratio, label, colour = party)) +
     labels = c("×0,1", "×0,3", "×1", "×3", "×10"), oob = scales::squish) +
   coord_cartesian(clip = "off") +
   labs(title = "Что предсказывает выбор партии",
-    subtitle = paste0("Мультиномиальная логистическая регрессия · ", model_n,
-      " анкет с правом голоса · все попарные сравнения: ", paste(model_parties, collapse = ", "),
-      "\nСправа от ×1 — признак повышает шансы выбрать первую партию пары, а не вторую",
-      "; закрашенная точка — 95% интервал не пересекает ×1"),
+    subtitle = paste0("Модель учитывает все признаки сразу · ", model_n, " человек · все пары партий",
+      "\nПравее ×1 — признак повышает шансы выбрать первую партию пары, а не вторую",
+      "; закрашенная точка — эффект надёжный"),
     x = NULL, y = NULL,
-    caption = paste0("RRR — отношение относительных шансов при прочих равных; непрерывные признаки — на одно стандартное отклонение.",
-      "\nИнтервалы и точки за пределами ×0,1–×10 прижаты к краю шкалы (значок ›); точные значения — в подсказке.",
-      "\nМалая выборка: оценки неустойчивы, это разведочная модель, а не прогноз.")) +
+    caption = paste0("Для характера и предпочтений — при заметно более высоком значении признака (на одно стандартное отклонение).",
+      "\nЛиния — вероятный разброс; всё, что за ×0,1–×10, прижато к краю (значок ›), точные значения — при наведении.",
+      "\nЛюдей мало: оценки грубые, это подсказка, а не прогноз.")) +
   chart_theme +
   theme(strip.placement = "outside",
     strip.text.y.left = element_text(angle = 0, face = "bold", colour = "#59666E", hjust = 1),

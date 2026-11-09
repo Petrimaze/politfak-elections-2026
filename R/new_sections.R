@@ -159,7 +159,7 @@ p_channels <- ggplot(channel_summary, aes(share, party, colour = party)) +
   scale_x_continuous(labels = scales::label_percent(accuracy = 1), limits = c(0, 1.3),
     breaks = seq(0, 1, 0.25)) +
   labs(title = "Подписка на канал ещё не голос",
-    subtitle = paste0("Только имеющие право голоса (", voter_n, ") · точка и 95% интервал Уилсона"),
+    subtitle = paste0("Только те, кто может голосовать (", voter_n, ") · точка — доля, линия — вероятный разброс"),
     x = NULL, y = NULL,
     caption = paste0("Подписаны на все пять каналов: ", all_five_n, " из ", voter_n,
       "; ни на один: ", no_channel_n, ". Многие читают всех, поэтому охват канала плохо предсказывает голос.")) +
