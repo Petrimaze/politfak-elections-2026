@@ -1,0 +1,75 @@
+.panel-tabset > .nav-tabs {
+  gap: .4rem;
+  border-bottom: 1px solid #dce1e4;
+  margin-bottom: 1.4rem;
+}
+.panel-tabset > .nav-tabs .nav-link {
+  border: 0;
+  border-radius: .5rem .5rem 0 0;
+  color: #59666e;
+  padding: .7rem 1.2rem;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+.panel-tabset > .nav-tabs .nav-link:hover {
+  color: #182c38;
+  background: #f0f3f4;
+}
+.panel-tabset > .nav-tabs .nav-link.active {
+  color: #182c38;
+  background: #e9eef0;
+  box-shadow: inset 0 -3px #182c38;
+  font-weight: 600;
+}
+.panel-tabset > .nav-tabs .nav-link:focus-visible {
+  outline: 2px solid #182c38;
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .panel-tabset .tab-pane.active {
+    animation: panel-appear 180ms ease-out;
+  }
+  @keyframes panel-appear {
+    from { opacity: .4; transform: translateY(3px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+.mca-controls {
+  border-top: 2px solid #dce1e4;
+  border-bottom: 2px solid #dce1e4;
+  padding: 1rem 0;
+  margin: 1.2rem 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.mca-controls label { font-weight: 600; color: #182c38; }
+.mca-controls select { max-width: 20rem; }
+.mca-quality { color: #59666e; font-size: .9rem; }
+.mca-neighbour-list {
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.mca-neighbour-list li {
+  border-top: 2px solid #dce1e4;
+  padding-top: .8rem;
+}
+.mca-neighbour-list p { margin: .4rem 0; font-size: .9rem; }
+.mca-neighbour-list small { color: #68747b; }
+@media (max-width: 600px) {
+  .mca-neighbour-list { grid-template-columns: 1fr; }
+}
+.stat-table { overflow-x: auto; margin: 1rem 0 1.5rem; }
+.stat-table table {
+  width: 100%;
+  border-top: 2px solid #485963;
+  border-bottom: 2px solid #485963;
+  font-size: .9rem;
+}
+.stat-table thead { border-bottom: 2px solid #485963; }
+.stat-table th { font-weight: 700; }
+.stat-table td, .stat-table th { padding: .65rem .55rem; }
+.stat-table tbody tr { border-bottom: 1px solid #c6cdd2; }

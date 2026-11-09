@@ -1,0 +1,399 @@
+---
+title: "Выборы на политфаке 2026/2027"
+format:
+  html:
+    css: styles.css
+execute:
+  echo: false
+  message: false
+  warning: false
+---
+
+```{r}
+#| include: false
+source("R/prepare_data.R")
+source("R/vote_charts.R")
+source("R/vote_flows.R")
+source("R/additional_charts.R")
+source("R/ai_charts.R")
+source("R/statistical_tests.R")
+source("R/new_sections.R")
+source("R/mca_portraits.R")
+```
+
+## За кого проголосовали бы
+
+**`r nrow(votes)` ответов**, из них **`r sum(votes$eligible == 1, na.rm = TRUE)` с правом голоса**.
+Обновлено `r format(loaded_at, "%d.%m.%Y %H:%M", tz = "Europe/Moscow")`.
+
+Проценты и интервалы рассчитаны **только среди имеющих право голоса**.
+В знаменатель включены также неопределившиеся и отказавшиеся отвечать.
+Серые столбики справа — **число ответов без права голоса**, на отдельной шкале.
+Порядок партий во всех панелях — по общей поддержке среди имеющих право голоса.
+Это заявленные предпочтения, а не поданные бюллетени.
+
+::: {.panel-tabset}
+
+### Все
+
+```{r}
+#| fig-width: 12
+#| fig-height: 6
+p_total <- vote_chart(filter(vote_summary, breakdown == "overall"),
+  "Кого выбирают имеющие право голоса")
+interactive_chart(p_total, 6)
+```
+
+### Пол
+
+```{r}
+#| fig-width: 12
+#| fig-height: 11
+p_gender <- vote_chart(filter(vote_summary, breakdown == "gender"), "Выбор по полу")
+interactive_chart(p_gender, 11)
+```
+
+### Курс
+
+Группы без ответивших с правом голоса исключены из разбивок.
+
+```{r}
+#| fig-width: 12
+#| fig-height: 13
+p_course <- vote_chart(filter(vote_summary, breakdown == "course"), "Выбор по курсам")
+interactive_chart(p_course, 13)
+```
+
+### Направление
+
+```{r}
+#| fig-width: 12
+#| fig-height: 17
+p_track <- vote_chart(filter(vote_summary, breakdown == "track"), "Выбор по направлениям")
+interactive_chart(p_track, 17)
+```
+
+:::
+
+## Откуда приходят сторонники
+
+Слева — голосование на выборах 2025/26, в центре — текущие предпочтения,
+справа — голосование в 2024/25 (читается справа налево).
+Учитываются только имеющие право голоса сейчас. Наведите на ленту,
+чтобы увидеть направление перехода и число ответов.
+
+```{r}
+girafe(ggobj = p_flows, width_svg = 16, height_svg = 8,
+  options = list(opts_sizing(rescale = TRUE),
+    opts_hover(css = "opacity:0.9;"),
+    opts_hover_inv(css = "opacity:0.12;"),
+    opts_tooltip(css = "background:white;color:#182c38;padding:12px;border:1px solid #dce1e4;border-radius:8px;")))
+```
+
+## Второй выбор
+
+Учитываются только имеющие право голоса.
+Вторые предпочтения не означают дополнительные голоса и не прибавляются к первым.
+Ответов, в которых второй выбор совпадает с первым: **`r invalid_second_n`**.
+Они исключены из подсчёта вторых упоминаний; в матрице показаны отдельно.
+
+::: {.panel-tabset}
+
+### Первый и второй выбор
+
+```{r}
+interactive_chart(p_second, 5)
+```
+
+### Матрица предпочтений
+
+```{r}
+interactive_chart(p_second_matrix, 6)
+```
+
+:::
+
+### Проверка: первый или второй выбор
+
+Для каждой партии точный тест Мак-Немара сравнивает людей, назвавших её
+**только первой**, с назвавшими **только второй**.
+Это биномиальный тест несовпавших пар, а не сравнение независимых долей.
+В расчёт входят `r nrow(choice_test_data)` целиком валидных пар:
+пропуски и совпавшие названия партий исключены. Поэтому знаменатель
+может отличаться от описательного графика.
+
+::: {.stat-table}
+```{r}
+test_table("Первый и второй выбор")
+```
+:::
+
+## Подписка на каналы и голос
+
+Слева — какая доля подписчиков канала партии голосует за неё,
+справа — какая доля её избирателей подписана на её канал.
+Учитываются только имеющие право голоса; один человек может быть подписан на несколько каналов.
+На все пять каналов подписаны **`r all_five_n` из `r voter_n`**.
+
+```{r}
+interactive_chart(p_channels, 5.5)
+```
+
+## Что важно при выборе партии
+
+Показаны все уровни оценки, а не только средний балл.
+Пункты упорядочены по доле оценок 4–5.
+
+```{r}
+interactive_chart(p_factors, 7)
+```
+
+### Проверка: юмор и программа
+
+Парный тест Уилкоксона сравнивает оценки одних и тех же людей.
+Медиана разности «юмор минус программа» —
+**`r factor_difference`** на шкале 1–5.
+После общей поправки Холма `r if (test_results$p_holm[2] < 0.05) "свидетельства различия сохраняются" else "свидетельств различия недостаточно"`.
+
+::: {.stat-table}
+```{r}
+test_table("Основные вопросы", "Юмор и программа")
+```
+:::
+
+### Своими словами
+
+На открытый вопрос «Что ещё влияет на ваш выбор» большинство ответили «ничего» или пропустили его:
+`r paste0(tolower(free_counts$kind), " — ", free_counts$n, collapse = "; ")`.
+Ответы с упоминанием конкретных людей не публикуются. Содержательные ответы — целиком, без правки:
+
+```{r}
+#| results: asis
+cat(paste0("- ", markdown_escape(free_answers), collapse = "\n"))
+```
+
+## Внимание к кампании и важность исхода
+
+Сначала рассмотрим совместное распределение ответов:
+каждый круг — сочетание двух оценок, размер показывает число людей.
+
+```{r}
+interactive_chart(p_attention, 6)
+```
+
+### Проверка: есть ли связь
+
+Корреляция Спирмена ρ = **`r round(unname(attention_test$estimate), 2)`**.
+Положительный знак означает, что более внимательное слежение
+сочетается с большей важностью исхода. После общей поправки Холма
+`r if (test_results$p_holm[1] < 0.05) "свидетельства связи сохраняются" else "свидетельств связи недостаточно"`.
+Причинность этим тестом не устанавливается.
+
+::: {.stat-table}
+```{r}
+test_table("Основные вопросы", "Внимание и важность исхода")
+```
+:::
+
+## Отношение к ИИ и нейрослопу
+
+Ответы разделяют несколько позиций: принятие любого ИИ-контента,
+принятие только после редактуры, использование лишь для вспомогательных задач,
+отказ от ИИ в контенте и безразличие. Это разные категории, а не единая шкала.
+Проценты рассчитаны среди имеющих право голоса; на второй вкладке — внутри партии.
+
+::: {.panel-tabset}
+
+### Все с правом голоса
+
+```{r}
+interactive_chart(p_ai, 5)
+```
+
+### По партиям
+
+```{r}
+interactive_chart(p_ai_party, 6)
+```
+
+:::
+
+### Проверка: различаются ли сторонники партий
+
+Общий тест Фишера проверяет связь между партией и пятью содержательными
+вариантами отношения к ИИ. После общей поправки Холма
+`r if (test_results$p_holm[3] < 0.05) "есть свидетельства связи" else "свидетельств связи недостаточно"`.
+V Крамера — описательная сила связи в таблице, а не доказательство эффекта.
+
+::: {.stat-table}
+```{r}
+test_table("Основные вопросы", "Отношение к ИИ по партиям")
+```
+:::
+
+## Критика соперников и интерес к выборам
+
+Обе шкалы порядковые, поэтому показано всё распределение, а не средний балл.
+Строки — все имеющие право голоса и сторонники партий с n ≥ 5.
+
+::: {.panel-tabset}
+
+### Критика других партий
+
+```{r}
+interactive_chart(p_criticism, 5.5)
+```
+
+### Интерес к выборам
+
+```{r}
+interactive_chart(p_interest, 5.5)
+```
+
+:::
+
+## Личностные профили сторонников
+
+Сравнение по пяти чертам TIPI на исходной шкале 1–7.
+В каждой группе показаны средние и 95% интервалы; серая черта —
+среднее среди всех имеющих право голоса с валидным ответом.
+Для партий с менее чем пятью ответами профиль не строится.
+Это описание участников опроса, а не психологическая характеристика всех избирателей партии.
+
+```{r}
+interactive_chart(p_traits, 11)
+```
+
+### Медианы и численность групп
+
+::: {.stat-table}
+```{r}
+trait_test_groups |>
+  mutate(trait = unname(trait_names[trait]),
+    value = paste0(median, " · n = ", n)) |>
+  select(Черта = trait, party, value) |>
+  pivot_wider(names_from = party, values_from = value) |>
+  knitr::kable()
+```
+:::
+
+### Проверка: различаются ли личностные профили
+
+По каждой черте — один общий тест Краскела—Уоллиса, без перебора пар партий.
+Он сравнивает **распределения баллов**, а не непосредственно средние.
+Включены только партии с ≥ 5 валидными ответами на соответствующую черту.
+H — статистика теста; величину различий оцениваем по описательным данным выше.
+
+::: {.stat-table}
+```{r}
+test_table("TIPI")
+```
+:::
+
+## Карта MCA: портреты сторонников
+
+Множественный анализ соответствий собирает в одну карту выбор партии, пол, курс,
+пять черт TIPI (выше или ниже медианы) и то, что важно в кампании:
+подачу (оформление, видео, регулярность, форматы, юмор), офлайн и помощь
+(офлайн-мероприятия, практическая помощь, личное знакомство) и программу.
+Признаки, лежащие в одном направлении от центра, чаще встречаются у одних и тех же людей.
+Анкет с правом голоса в расчёте: **`r mca_n`**. Небрежные анкеты
+(`r mca_dropped[["careless"]]`), а также анкеты без пола, курса или оценок факторов и сторонники партий,
+у которых в карте меньше пяти человек (`r mca_dropped[["incomplete"]]`), исключены.
+
+::: {.panel-tabset}
+
+### Карта
+
+```{r}
+portrait_explorer
+```
+
+### Проверка устойчивости
+
+Партия здесь не участвует в построении осей и только проецируется на них.
+Если различия держатся и так, они не созданы самой партийной переменной.
+`r if (length(robust_significant)) paste0("Порог |v-тест| ≥ 2 тогда проходят: ", paste(robust_significant, collapse = ", "), ".") else "Тогда ни одна партия не проходит порог |v-тест| ≥ 2: различия между партиями на карте — тенденции, а не закономерности."`
+
+```{r}
+mca_widget(p_mca_robust)
+```
+
+::: {.stat-table}
+```{r}
+robust_table()
+```
+:::
+
+:::
+
+## Как собирались ответы
+
+```{r}
+interactive_chart(p_waves, 6)
+```
+
+### Небрежные и противоречивые анкеты
+
+Ответы не удаляются из отчёта, кроме карты MCA: здесь только флаги.
+Одна анкета может попасть под несколько проверок.
+
+::: {.stat-table}
+```{r}
+quality_table()
+```
+:::
+
+```{r}
+interactive_chart(p_sensitivity, 4.5)
+```
+
+::: {.callout-note collapse="true"}
+## Как читать статистические проверки
+
+Это **разведочный анализ**: вопросы выбраны после знакомства с данными.
+Все проверки двусторонние. **Одна общая поправка Холма на все
+`r nrow(test_results)` проверок во всём отчёте** сохраняется независимо от расположения таблиц.
+
+Основной ориентир — столбец **p · Холм**; порог 0,05 выбран как условное правило.
+Большое p не доказывает равенства или отсутствия связи.
+Тесты не устраняют смещение самоотбора и зависимость ответов из общих социальных кругов.
+
+Пропуски исключаются отдельно в каждом анализе; неизвестный ответ не превращается в ноль.
+Для Спирмена и Уилкоксона используются стандартные приближения R из-за повторяющихся оценок.
+Уилкоксон проверяет сдвиг парных различий при предположении их симметрии;
+медиана разностей показана отдельно как описательная оценка.
+Фишер считается точно; если точный расчёт не помещается в память, используется
+воспроизводимое приближение того же теста на 100 000 таблиц с фиксированным seed.
+Фактически использованный вариант указан в таблице.
+Полные результаты сохраняются в `data/processed/statistical_tests.csv`.
+Используются стандартные функции [R stats](https://stat.ethz.ch/CRAN/doc/manuals/r-release/packages/stats/refman/stats.html).
+:::
+
+```{r}
+#| include: false
+dir.create("figures", showWarnings = FALSE)
+ggsave("figures/22-channels.png", p_channels, width = 12, height = 5.5, dpi = 300, device = ragg::agg_png)
+ggsave("figures/23-criticism.png", p_criticism, width = 12, height = 5.5, dpi = 300, device = ragg::agg_png)
+ggsave("figures/24-interest.png", p_interest, width = 12, height = 5.5, dpi = 300, device = ragg::agg_png)
+ggsave("figures/25-mca-portraits.png", draw_portrait_map(), width = 12, height = 11, dpi = 300, device = ragg::agg_png)
+ggsave("figures/26-mca-robustness.png", p_mca_robust, width = 12, height = 11, dpi = 300, device = ragg::agg_png)
+ggsave("figures/27-waves.png", p_waves, width = 12, height = 6, dpi = 300, device = ragg::agg_png)
+ggsave("figures/28-careless-sensitivity.png", p_sensitivity, width = 12, height = 4.5, dpi = 300, device = ragg::agg_png)
+ggsave("figures/21-attention-importance.png", p_attention, width = 12, height = 6, dpi = 300, device = ragg::agg_png)
+ggsave("figures/18-ai-attitudes.png", p_ai, width = 12, height = 5, dpi = 300, device = ragg::agg_png)
+ggsave("figures/19-ai-by-party.png", p_ai_party, width = 12, height = 6, dpi = 300, device = ragg::agg_png)
+ggsave("figures/13-first-second.png", p_second, width = 12, height = 5, dpi = 300, device = ragg::agg_png)
+ggsave("figures/14-second-matrix.png", p_second_matrix, width = 12, height = 6, dpi = 300, device = ragg::agg_png)
+ggsave("figures/15-choice-factors.png", p_factors, width = 12, height = 7, dpi = 300, device = ragg::agg_png)
+ggsave("figures/16-trait-profiles.png", p_traits, width = 12, height = 11, dpi = 300, device = ragg::agg_png)
+ggsave("figures/07-vote-flows.png", p_flows, width = 16, height = 8, dpi = 300, device = ragg::agg_png)
+ggsave("figures/01-overall.png", p_total, width = 12, height = 6, dpi = 300, device = ragg::agg_png)
+ggsave("figures/02-gender.png", p_gender, width = 12, height = 11, dpi = 300, device = ragg::agg_png)
+ggsave("figures/03-course.png", p_course, width = 12, height = 13, dpi = 300, device = ragg::agg_png)
+ggsave("figures/04-track.png", p_track, width = 12, height = 17, dpi = 300, device = ragg::agg_png)
+publication <- wrap_plots(p_total, p_gender, ncol = 1, heights = c(1, 1.8))
+ggsave("figures/05-publication.png", publication, width = 12, height = 17, dpi = 300, device = ragg::agg_png)
+education <- wrap_plots(p_course, p_track, ncol = 1)
+ggsave("figures/06-education.png", education, width = 12, height = 34, dpi = 300, device = ragg::agg_png)
+```

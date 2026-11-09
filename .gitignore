@@ -1,0 +1,16 @@
+data/
+output/
+figures/
+.quarto/
+.Rhistory
+.RData
+.httr-oauth
+
+/.quarto/
+**/*.quarto_ipynb
+
+# Не публикуем: ID таблицы с сырыми ответами, скриншоты формы, системный мусор
+sheet_id.txt
+скриншоты формы 2026/
+скриншоты формы 2026.zip
+.DS_Store

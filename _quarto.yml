@@ -1,0 +1,12 @@
+project:
+  type: default
+  output-dir: output
+execute:
+  cache: false
+  freeze: false
+format:
+  html:
+    lang: ru
+    toc: true
+    embed-resources: true
+    code-fold: true
