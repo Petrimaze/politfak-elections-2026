@@ -6,33 +6,28 @@ attention_pairs <- voters |>
   filter(attention %in% 1:5, importance %in% 1:5)
 attention_test <- cor.test(attention_pairs$attention, attention_pairs$importance,
   method = "spearman", exact = FALSE)
-attention_counts <- attention_pairs |> count(attention, importance) |>
-  mutate(tooltip = paste0("Внимание: ", attention, " из 5",
-    "\nВажность исхода: ", importance, " из 5\nОтветов: ", n))
-p_attention <- ggplot(attention_counts, aes(attention, importance)) +
-  geom_point_interactive(aes(size = n, tooltip = tooltip,
-    data_id = paste(attention, importance)), colour = "#087F8C", alpha = 0.8) +
-  scale_size_area(max_size = 13, breaks = scales::breaks_pretty(3), name = "Ответов") +
+attention_points <- attention_pairs |>
+  mutate(id = row_number(),
+    tooltip = paste0("Внимание: ", attention, " из 5\nВажность исхода: ", importance, " из 5"))
+p_attention <- ggplot(attention_points, aes(attention, importance)) +
+  geom_smooth(method = "loess", formula = y ~ x, span = 1, method.args = list(degree = 1),
+    colour = "#087F8C", fill = "#087F8C", alpha = 0.15, linewidth = 1.2) +
+  geom_point_interactive(aes(tooltip = tooltip, data_id = id),
+    position = position_jitter(width = 0.16, height = 0.16, seed = 26),
+    colour = "#485963", alpha = 0.45, size = 2.2) +
   scale_x_continuous(breaks = 1:5, limits = c(0.6, 5.4),
     labels = c("Совсем\nне слежу", "Изредка", "Время\nот времени",
       "Внимательно", "Очень\nвнимательно")) +
   scale_y_continuous(breaks = 1:5, limits = c(0.6, 5.4)) +
   labs(title = "Внимание к кампании и важность исхода",
-    subtitle = paste0(nrow(attention_pairs), " полных пар ответов с правом голоса · размер круга — число людей"),
+    subtitle = paste0(nrow(attention_pairs), " полных пар ответов с правом голоса · точка — человек, линия — сглаженное среднее (LOESS) и 95% интервал"),
     x = "Как внимательно следят за кампанией",
     y = "Важность исхода · 1–5",
-    caption = "1 — совсем не важно; 5 — очень важно. Незаполненные и неопределённые ответы исключены.") +
+    caption = "1 — совсем не важно; 5 — очень важно. Точки слегка сдвинуты случайным образом, чтобы совпадающие ответы не сливались.\nНезаполненные и неопределённые ответы исключены.") +
   chart_theme +
   theme(axis.title = element_text(colour = "#59666E", size = 10),
     panel.grid.major.y = element_line(colour = "#E5E7E8", linewidth = 0.25),
-    legend.position = "right", plot.caption = element_text(hjust = 0, size = 8))
-
-factor_pairs <- voters |>
-  transmute(humor = as.numeric(factor_6_score), program = as.numeric(factor_1_score)) |>
-  drop_na()
-factor_test <- wilcox.test(factor_pairs$humor, factor_pairs$program,
-  paired = TRUE, alternative = "two.sided", exact = FALSE, correct = TRUE)
-factor_difference <- median(factor_pairs$humor - factor_pairs$program)
+    plot.caption = element_text(hjust = 0, size = 8))
 
 ai_test_data <- voters |>
   transmute(party = as.character(haven::as_factor(vote_first)),
@@ -54,13 +49,12 @@ ai_cramer_v <- sqrt(ai_chisq /
 
 primary_tests <- tibble(
   family = "Основные вопросы",
-  question = c("Внимание и важность исхода", "Юмор и программа", "Отношение к ИИ по партиям"),
-  method = c("Спирмен", "Парный Уилкоксон", ai_test_method),
-  n = c(nrow(attention_pairs), nrow(factor_pairs), nrow(ai_test_data)),
+  question = c("Внимание и важность исхода", "Отношение к ИИ по партиям"),
+  method = c("Спирмен", ai_test_method),
+  n = c(nrow(attention_pairs), nrow(ai_test_data)),
   effect = c(paste0("ρ = ", round(unname(attention_test$estimate), 2)),
-    paste0("Медиана разностей (баллы): ", factor_difference),
     paste0("V Крамера = ", round(ai_cramer_v, 2))),
-  p = c(attention_test$p.value, factor_test$p.value, ai_test$p.value))
+  p = c(attention_test$p.value, ai_test$p.value))
 
 # Один общий тест распределений по каждой черте, без перебора пар партий.
 trait_test_rows <- list()
@@ -79,27 +73,11 @@ trait_test_groups <- traits_long |> filter(party %in% parties, !is.na(score)) |>
   summarise(n = n(), median = median(score), .groups = "drop") |>
   filter(n >= 5)
 
-# Пары должны быть валидны целиком: некорректный второй ответ не равен «нет».
-choice_test_data <- choices |> filter(!invalid_second, !is.na(first), !is.na(second))
-choice_test_rows <- list()
-for (party in parties) {
-  first_only <- sum(choice_test_data$first == party & choice_test_data$second != party)
-  second_only <- sum(choice_test_data$first != party & choice_test_data$second == party)
-  discordant <- first_only + second_only
-  # Точный Мак-Немар — обычный биномиальный тест несовпавших пар.
-  p <- if (discordant > 0) binom.test(first_only, discordant, p = 0.5)$p.value else 1
-  choice_test_rows[[party]] <- tibble(family = "Первый и второй выбор",
-    question = party, method = "Точный Мак-Немар", n = nrow(choice_test_data),
-    effect = paste0("Только первый: ", first_only, "; только второй: ", second_only),
-    p = p)
-}
-choice_tests <- bind_rows(choice_test_rows)
-
-# Одна общая поправка Холма на все проверки раздела.
-test_results <- bind_rows(primary_tests, trait_tests, choice_tests) |>
-  mutate(p_holm = p.adjust(p, method = "holm"),
-    conclusion = if_else(p_holm < 0.05,
-      "Свидетельства различия / связи", "Недостаточно свидетельств"))
+# Поправка на множественные сравнения не применяется; p читаются по отдельности.
+test_results <- bind_rows(primary_tests, trait_tests) |>
+  mutate(conclusion = if_else(p < 0.05,
+    "Свидетельства различия / связи", "Недостаточно свидетельств"))
+p_of <- function(question_name) test_results$p[test_results$question == question_name]
 format_p <- function(x) {
   ifelse(x < 0.001, "<0,001", formatC(x, format = "f", digits = 3, decimal.mark = ","))
 }
@@ -108,9 +86,8 @@ test_table <- function(family_name, question_name = NULL) {
     if (is.null(question_name)) TRUE else question %in% question_name) |>
     transmute(Вопрос = question, Тест = method, n,
       Оценка = effect,
-      p = format_p(p),
-      `p · Холм` = format_p(p_holm)) |>
-    knitr::kable(align = c("l", "l", "r", "l", "r", "r"))
+      p = format_p(p)) |>
+    knitr::kable(align = c("l", "l", "r", "l", "r"))
 }
 write_csv(test_results, "data/processed/statistical_tests.csv")
 write_csv(trait_test_groups, "data/processed/trait_test_groups.csv")
